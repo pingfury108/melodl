@@ -1,5 +1,6 @@
 pub mod client;
 pub mod core;
+pub mod crypto;
 pub mod error;
 pub mod sources;
 

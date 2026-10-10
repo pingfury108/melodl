@@ -10,6 +10,8 @@ fn registry() -> &'static HashMap<&'static str, SourceFactory> {
     REGISTRY.get_or_init(|| {
         let mut m = HashMap::new();
         m.insert("fivesing", crate::sources::fivesing::create as SourceFactory);
+        m.insert("kuwo", crate::sources::kuwo::create as SourceFactory);
+        m.insert("migu", crate::sources::migu::create as SourceFactory);
         m
     })
 }

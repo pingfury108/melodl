@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 
+use crate::core::text::{clean_lrc, strip_html_tags};
 use crate::core::{tester, MusicSource, SearchCtx, SongInfo};
 use crate::error::Result;
 
@@ -151,30 +152,4 @@ async fn supplement_lyric(song: &mut SongInfo, kind: &str, ctx: &SearchCtx) {
         .pointer("/data/user/I")
         .and_then(|v| v.as_str())
         .map(str::to_string);
-}
-
-/// 去除搜索关键词高亮的 <em> 等 HTML 标签
-fn strip_html_tags(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for c in s.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => out.push(c),
-            _ => {}
-        }
-    }
-    out
-}
-
-/// 去掉 LRC 中的元信息标签行
-fn clean_lrc(text: &str) -> String {
-    text.lines()
-        .filter(|line| {
-            let t = line.trim();
-            !(t.starts_with("[ti:") || t.starts_with("[ar:") || t.starts_with("[al:") || t.starts_with("[by:"))
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }

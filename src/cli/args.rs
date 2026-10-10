@@ -13,7 +13,7 @@ pub struct Cli {
     pub keyword: Option<String>,
 
     /// 音乐源, 逗号分隔
-    #[arg(short = 'm', long, default_value = "fivesing", global = true)]
+    #[arg(short = 'm', long, default_value = "migu,kuwo,fivesing", global = true)]
     pub sources: String,
 
     /// 下载目录

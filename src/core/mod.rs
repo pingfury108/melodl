@@ -4,6 +4,7 @@ pub mod registry;
 pub mod song;
 pub mod source;
 pub mod tester;
+pub mod text;
 
 pub use progress::ProgressEvent;
 pub use song::{Protocol, SongInfo};
