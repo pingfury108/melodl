@@ -54,8 +54,19 @@ async fn main() -> anyhow::Result<()> {
     spinner.enable_steady_tick(std::time::Duration::from_millis(100));
     spinner.set_message(format!("正在从 {} 搜索「{}」...", source_names.join(","), keyword));
 
-    let songs = client.search(&keyword).await;
+    // 错误事件输出到 stderr
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<ProgressEvent>(64);
+    let err_printer = tokio::spawn(async move {
+        while let Some(ev) = rx.recv().await {
+            if let ProgressEvent::Error { source, message } = ev {
+                eprintln!("[{}] 错误: {}", source, message);
+            }
+        }
+    });
+
+    let songs = client.search_with_events(&keyword, tx).await;
     spinner.finish_and_clear();
+    let _ = err_printer.await;
 
     if songs.is_empty() {
         println!("未找到相关歌曲");

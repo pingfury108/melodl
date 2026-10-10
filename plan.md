@@ -266,14 +266,15 @@ comfy-table = { version = "7", optional = true }
 - [ ] `crypto/migu.rs` / `crypto/kuwo.rs`
 - [ ] **验收**: 三个源并发搜索, 去重, 展示, 下载成功
 
-### P2 — 主力源(加密重头)
+### P2 — 主力源(加密重头) ✅ 已完成
 
-- [ ] **网易云**: weapi (AES-CBC + RSA) / eapi (AES-ECB) 加密
-- [ ] **QQ**: sign 签名
-- [ ] **酷狗**: 签名
-- [ ] 歌词获取与 `.lrc` 保存
-- [ ] 音频标签/封面写入 (lofty)
-- [ ] **验收**: 对齐原版 `DEFAULT_MUSIC_SOURCES` (咪咕/网易云/QQ/酷我 + 5sing)
+- [x] **网易云**: eapi (AES-ECB) 已实现; 匿名 cookie 已失效, 实际走 kangqiovo/bugpk 第三方兜底
+- [x] **QQ**: 搜索改走 shc.y.qq.com/soso 老接口 (u.y.qq.com 搜索有 TLS 指纹风控); vkey 下载正常
+- [x] **酷狗**: 老移动接口 getSongInfo (免费歌直链) + baka.plus 兜底; gateway 签名已实现但需设备验证未启用
+- [x] 歌词获取与 `.lrc` 保存 (含酷我逐字歌词转换)
+- [ ] 音频标签/封面写入 (lofty) — 移至 P3
+
+> P2 关键发现: ① QQ 搜索端点做 JA3 指纹风控, Python/OpenSSL 可过, curl/rustls 被拦; ② 环境代理会干扰部分第三方 API, 默认客户端已禁用环境代理 (`no_proxy`); ③ QQ searchid 必须按官方随机公式生成, 否则返回空结果。
 
 ### P3 — 体验增强
 

@@ -171,6 +171,7 @@ impl MusicClientBuilder {
         }
         let http = reqwest::Client::builder()
             .user_agent(default_ua())
+            .no_proxy() // 直连, 避免环境代理干扰第三方音乐接口
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         Ok(MusicClient {
