@@ -1,0 +1,40 @@
+[package]
+name = "melodl"
+version = "0.1.0"
+edition = "2021"
+description = "A lightweight music search & downloader (Rust port of musicdl)"
+license = "MIT"
+
+[lib]
+name = "melodl"
+
+[[bin]]
+name = "melodl"
+required-features = ["cli"]
+
+[features]
+default = []
+cli = ["dep:clap", "dep:indicatif", "dep:comfy-table"]
+
+[dependencies]
+# async & http
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "cookies", "gzip", "brotli", "rustls-tls", "charset", "http2"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# data
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+
+# utils
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sanitize-filename = "0.6"
+
+# cli
+clap = { version = "4", features = ["derive"], optional = true }
+indicatif = { version = "0.17", optional = true }
+comfy-table = { version = "7", optional = true }
