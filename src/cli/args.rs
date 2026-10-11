@@ -8,21 +8,25 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
 
-    /// 搜索关键词
+    /// 搜索关键词 (不填则进入交互模式)
     #[arg(short = 'k', long, global = true)]
     pub keyword: Option<String>,
 
-    /// 音乐源, 逗号分隔
-    #[arg(short = 'm', long, default_value = "migu,netease,qq,kuwo,fivesing,kugou", global = true)]
-    pub sources: String,
+    /// 音乐源, 逗号分隔 (默认见配置文件或内置)
+    #[arg(short = 'm', long, global = true)]
+    pub sources: Option<String>,
 
     /// 下载目录
-    #[arg(short = 'o', long, default_value = "./music", global = true)]
-    pub work_dir: PathBuf,
+    #[arg(short = 'o', long, global = true)]
+    pub work_dir: Option<PathBuf>,
 
     /// 每源搜索结果数量
-    #[arg(short = 'n', long, default_value_t = 10, global = true)]
-    pub limit: usize,
+    #[arg(short = 'n', long, global = true)]
+    pub limit: Option<usize>,
+
+    /// 下载并发数
+    #[arg(short = 'j', long, global = true)]
+    pub concurrency: Option<usize>,
 
     /// 直接下载第一个结果(非交互)
     #[arg(long, global = true)]
@@ -45,4 +49,6 @@ pub struct Cli {
 pub enum Commands {
     /// 列出所有可用音乐源
     Sources,
+    /// 打印配置文件路径
+    Config,
 }

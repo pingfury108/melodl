@@ -1,13 +1,15 @@
 mod cli;
 
-use std::io::Write;
-
 use clap::Parser;
 use cli::args::{Cli, Commands};
+use cli::config::{expand_home, Config};
 use comfy_table::{Cell, Color, Table};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use inquire::{MultiSelect, Text};
 use melodl::core::registry::available_sources;
 use melodl::{MusicClient, ProgressEvent, SongInfo};
+
+const DEFAULT_SOURCES: &str = "migu,netease,qq,kuwo,fivesing,kugou";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,31 +21,66 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let cli = Cli::parse();
+    let config = Config::load();
 
-    if let Some(Commands::Sources) = cli.command {
-        println!("可用音乐源:");
-        for name in available_sources() {
-            println!("  - {}", name);
+    match cli.command {
+        Some(Commands::Sources) => {
+            println!("可用音乐源:");
+            for name in available_sources() {
+                println!("  - {}", name);
+            }
+            return Ok(());
         }
-        return Ok(());
+        Some(Commands::Config) => {
+            match Config::path() {
+                Some(p) => {
+                    println!("配置文件: {}", p.display());
+                    if !p.exists() {
+                        println!("(尚未创建, 示例:)");
+                        println!(
+                            "  sources = [\"migu\", \"netease\", \"qq\", \"kuwo\"]\n  work_dir = \"~/Music/melodl\"\n  limit = 10\n  concurrency = 5"
+                        );
+                    }
+                }
+                None => println!("无法确定配置目录"),
+            }
+            return Ok(());
+        }
+        None => {}
     }
 
-    let Some(keyword) = cli.keyword.clone() else {
-        eprintln!("请提供搜索关键词: melodl -k <关键词> (或用 `melodl sources` 查看可用源)");
-        std::process::exit(1);
-    };
-
+    // 合并: CLI 参数 > 配置文件 > 内置默认
     let source_names: Vec<String> = cli
         .sources
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
+        .as_deref()
+        .map(|s| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect())
+        .or(config.sources)
+        .unwrap_or_else(|| DEFAULT_SOURCES.split(',').map(str::to_string).collect());
+    let work_dir = cli
+        .work_dir
+        .or_else(|| config.work_dir.as_deref().map(expand_home))
+        .unwrap_or_else(|| "./music".into());
+    let limit = cli.limit.or(config.limit).unwrap_or(10);
+    let concurrency = cli.concurrency.or(config.concurrency).unwrap_or(5);
+
+    // 关键词: 参数缺失时交互输入
+    let keyword = match cli.keyword.clone() {
+        Some(k) => k,
+        None => {
+            let k = Text::new("输入搜索关键词:").prompt()?;
+            if k.trim().is_empty() {
+                println!("已取消");
+                return Ok(());
+            }
+            k.trim().to_string()
+        }
+    };
 
     let client = MusicClient::builder()
         .sources(source_names.clone())
-        .work_dir(cli.work_dir.clone())
-        .search_size_per_source(cli.limit)
+        .work_dir(work_dir)
+        .search_size_per_source(limit)
+        .concurrency(concurrency)
         .build()?;
 
     // 搜索(带 spinner)
@@ -89,16 +126,7 @@ async fn main() -> anyhow::Result<()> {
     } else if let Some(ids) = &cli.ids {
         parse_ids(ids, &songs)
     } else {
-        print!("输入要下载的序号(逗号分隔, 回车取消): ");
-        std::io::stdout().flush()?;
-        let mut line = String::new();
-        std::io::stdin().read_line(&mut line)?;
-        let line = line.trim();
-        if line.is_empty() {
-            println!("已取消");
-            return Ok(());
-        }
-        parse_ids(line, &songs)
+        interactive_select(&songs)?
     };
 
     if selected.is_empty() {
@@ -145,6 +173,32 @@ fn parse_ids(ids: &str, songs: &[SongInfo]) -> Vec<SongInfo> {
         .filter_map(|s| s.trim().parse::<usize>().ok())
         .filter_map(|i| songs.get(i.saturating_sub(1)).cloned())
         .collect()
+}
+
+/// 上下键移动, 空格多选, 回车确认
+fn interactive_select(songs: &[SongInfo]) -> anyhow::Result<Vec<SongInfo>> {
+    let options: Vec<String> = songs
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            format!(
+                "{}. {} - {} [{}] {} [{}]",
+                i + 1,
+                truncate(&s.singers, 10),
+                truncate(&s.song_name, 24),
+                s.ext.as_deref().unwrap_or("-"),
+                s.file_size_display(),
+                s.source
+            )
+        })
+        .collect();
+    let picked = MultiSelect::new("选择要下载的歌曲 (空格多选, 回车确认):", options)
+        .with_page_size(15)
+        .raw_prompt()?;
+    Ok(picked
+        .iter()
+        .filter_map(|opt| songs.get(opt.index).cloned())
+        .collect())
 }
 
 async fn download_with_progress(client: &MusicClient, songs: &[SongInfo]) {

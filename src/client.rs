@@ -12,6 +12,7 @@ pub struct MusicClient {
     search_size_per_source: usize,
     search_size_per_page: usize,
     max_retries: usize,
+    concurrency: usize,
     http: reqwest::Client,
 }
 
@@ -21,6 +22,7 @@ pub struct MusicClientBuilder {
     search_size_per_source: usize,
     search_size_per_page: usize,
     max_retries: usize,
+    concurrency: usize,
 }
 
 impl MusicClient {
@@ -31,6 +33,7 @@ impl MusicClient {
             search_size_per_source: 10,
             search_size_per_page: 10,
             max_retries: 3,
+            concurrency: 5,
         }
     }
 
@@ -117,18 +120,19 @@ impl MusicClient {
         songs: &[SongInfo],
         events: Option<mpsc::Sender<ProgressEvent>>,
     ) -> Vec<PathBuf> {
-        let mut tasks = FuturesUnordered::new();
-        for song in songs.iter().filter(|s| s.with_valid_download_url()) {
-            let client = self.http.clone();
-            let dir = self.work_dir.clone();
-            let events = events.clone();
-            tasks.push(async move {
-                downloader::download_song(&client, song, &dir, events.as_ref()).await
+        let tasks = songs
+            .iter()
+            .filter(|s| s.with_valid_download_url())
+            .map(|song| {
+                let client = self.http.clone();
+                let dir = self.work_dir.clone();
+                let events = events.clone();
+                async move { downloader::download_song(&client, song, &dir, events.as_ref()).await }
             });
-        }
 
         let mut paths = Vec::new();
-        while let Some(res) = tasks.next().await {
+        let mut stream = futures::stream::iter(tasks).buffer_unordered(self.concurrency);
+        while let Some(res) = stream.next().await {
             match res {
                 Ok(p) => paths.push(p),
                 Err(e) => tracing::warn!("download failed: {}", e),
@@ -158,6 +162,16 @@ impl MusicClientBuilder {
         self
     }
 
+    pub fn max_retries(mut self, n: usize) -> Self {
+        self.max_retries = n.max(1);
+        self
+    }
+
+    pub fn concurrency(mut self, n: usize) -> Self {
+        self.concurrency = n.max(1);
+        self
+    }
+
     pub fn build(self) -> Result<MusicClient> {
         let names = self
             .source_names
@@ -180,6 +194,7 @@ impl MusicClientBuilder {
             search_size_per_source: self.search_size_per_source,
             search_size_per_page: self.search_size_per_page,
             max_retries: self.max_retries,
+            concurrency: self.concurrency,
             http,
         })
     }

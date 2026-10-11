@@ -3,6 +3,7 @@ pub mod progress;
 pub mod registry;
 pub mod song;
 pub mod source;
+pub mod tags;
 pub mod tester;
 pub mod text;
 

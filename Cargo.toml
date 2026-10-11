@@ -14,7 +14,7 @@ required-features = ["cli"]
 
 [features]
 default = []
-cli = ["dep:clap", "dep:indicatif", "dep:comfy-table"]
+cli = ["dep:clap", "dep:indicatif", "dep:comfy-table", "dep:inquire", "dep:toml", "dep:dirs"]
 
 [dependencies]
 # async & http
@@ -47,7 +47,13 @@ rand = "0.9"
 rand_core = { version = "0.6", features = ["getrandom"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
+# 音频
+lofty = "0.22"          # 标签/封面
+
 # cli
 clap = { version = "4", features = ["derive"], optional = true }
 indicatif = { version = "0.17", optional = true }
 comfy-table = { version = "7", optional = true }
+inquire = { version = "0.7", optional = true }
+toml = { version = "0.8", optional = true }
+dirs = { version = "6", optional = true }

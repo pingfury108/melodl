@@ -276,12 +276,14 @@ comfy-table = { version = "7", optional = true }
 
 > P2 关键发现: ① QQ 搜索端点做 JA3 指纹风控, Python/OpenSSL 可过, curl/rustls 被拦; ② 环境代理会干扰部分第三方 API, 默认客户端已禁用环境代理 (`no_proxy`); ③ QQ searchid 必须按官方随机公式生成, 否则返回空结果。
 
-### P3 — 体验增强
+### P3 — 体验增强 ✅ 已完成
 
-- [ ] 交互式 TUI: `inquire::MultiSelect` 光标多选 + `indicatif` 多进度条
-- [ ] 配置文件 `melodl.toml`(默认源、下载目录、并发数、cookie)
-- [ ] `--json` 输出模式(供外部程序集成)
-- [ ] **验收**: 裸 `melodl` 命令进入完整交互流程
+- [x] 交互式 TUI: `inquire` 关键词输入 + MultiSelect 空格多选 + `indicatif` 多进度条
+- [x] 配置文件 `~/.config/melodl/melodl.toml` (默认源/下载目录/数量/并发, CLI 参数覆盖)
+- [x] `--json` 输出模式(供外部程序集成)
+- [x] 音频标签/封面写入 (lofty, mp3/flac 已验证: TITLE/ARTIST/ALBUM + APIC 封面)
+- [x] 下载并发限流 (buffer_unordered)
+- [x] **验收**: `melodl config` 查看配置, 裸 `melodl` 进入完整交互流程
 
 ### P4 — 扩展(按需渐进)
 

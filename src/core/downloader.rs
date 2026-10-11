@@ -6,7 +6,7 @@ use futures::StreamExt;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 
-use super::{ProgressEvent, SongInfo};
+use super::{tags, ProgressEvent, SongInfo};
 use crate::error::{MelodlError, Result};
 
 pub async fn download_song(
@@ -64,6 +64,16 @@ pub async fn download_song(
             let _ = tokio::fs::write(lrc_path, lyric).await;
         }
     }
+
+    // 封面 + 标签
+    let cover = match &song.cover_url {
+        Some(u) if u.starts_with("http") => match client.get(u).send().await {
+            Ok(r) => r.bytes().await.ok().map(|b| (b.to_vec(), tags::cover_mime(u))),
+            Err(_) => None,
+        },
+        _ => None,
+    };
+    tags::write_tags(&save_path, song, cover);
 
     emit(ProgressEvent::DownloadFinished {
         id,
