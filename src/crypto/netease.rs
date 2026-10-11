@@ -34,7 +34,10 @@ mod tests {
     #[test]
     fn eapi_known_vector() {
         let payload = "{\"ids\": [2652820720], \"level\": \"standard\", \"encodeType\": \"flac\", \"header\": \"{\\\"os\\\": \\\"pc\\\", \\\"appver\\\": \\\"\\\", \\\"osver\\\": \\\"\\\", \\\"deviceId\\\": \\\"pyncm!\\\", \\\"requestId\\\": \\\"25000000\\\"}\"}";
-        let enc = encrypt_params("https://interface3.music.163.com/eapi/song/enhance/player/url/v1", payload);
+        let enc = encrypt_params(
+            "https://interface3.music.163.com/eapi/song/enhance/player/url/v1",
+            payload,
+        );
         assert!(enc.starts_with("fa90b329e9614f79e79598f37dc2edb487f00d1bc4c9b24cd57e6c318b907356"));
         assert!(enc.ends_with("e97a75046d87db6f5460ac240ad0b1c264a705303e"));
     }

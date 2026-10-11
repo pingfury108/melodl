@@ -15,8 +15,7 @@ const DEFAULT_SOURCES: &str = "migu,netease,qq,kuwo,fivesing,kugou";
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "warn".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
         )
         .init();
 
@@ -53,7 +52,12 @@ async fn main() -> anyhow::Result<()> {
     let source_names: Vec<String> = cli
         .sources
         .as_deref()
-        .map(|s| s.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect())
+        .map(|s| {
+            s.split(',')
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect()
+        })
         .or(config.sources)
         .unwrap_or_else(|| DEFAULT_SOURCES.split(',').map(str::to_string).collect());
     let work_dir = cli
@@ -86,9 +90,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 搜索/歌单(带 spinner)
     let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::with_template("{spinner} {msg}").unwrap(),
-    );
+    spinner.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
     spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
     let is_playlist = keyword.starts_with("playlist:");
@@ -166,7 +168,10 @@ fn print_table(songs: &[SongInfo]) {
             Cell::new(s.file_size_display()),
             Cell::new(s.duration_display()),
             ext,
-            Cell::new(&s.source),
+            Cell::new(match &s.root_source {
+                Some(rs) => format!("{}:{}", s.source, rs),
+                None => s.source.clone(),
+            }),
         ]);
     }
     println!("{table}");

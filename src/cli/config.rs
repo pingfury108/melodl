@@ -18,7 +18,9 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let Some(path) = Self::path() else { return Self::default() };
+        let Some(path) = Self::path() else {
+            return Self::default();
+        };
         let Ok(content) = std::fs::read_to_string(&path) else {
             return Self::default();
         };

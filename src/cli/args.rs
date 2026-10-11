@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "melodl", version, about = "音乐搜索下载工具 (仅供学习研究使用)")]
+#[command(
+    name = "melodl",
+    version,
+    about = "音乐搜索下载工具 (仅供学习研究使用)"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,

@@ -97,7 +97,9 @@ impl MusicSource for KuwoSource {
             else {
                 break;
             };
-            let Ok(json) = resp.json::<Value>().await else { break };
+            let Ok(json) = resp.json::<Value>().await else {
+                break;
+            };
             let Some(list) = json.pointer("/data/musicList").and_then(|v| v.as_array()) else {
                 break;
             };
@@ -107,7 +109,11 @@ impl MusicSource for KuwoSource {
             items.extend(list.iter().cloned());
             let total = json
                 .pointer("/data/total")
-                .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or_else(|| v.as_u64().map(|n| n as usize)))
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .or_else(|| v.as_u64().map(|n| n as usize))
+                })
                 .unwrap_or(0);
             if items.len() >= total {
                 break;
@@ -168,7 +174,11 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
             duration_s: item
                 .get("DURATION")
                 .or_else(|| item.get("duration"))
-                .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_u64())),
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse().ok())
+                        .or_else(|| v.as_u64())
+                }),
             cover_url: item
                 .get("hts_MVPIC")
                 .or_else(|| item.get("albumpic"))

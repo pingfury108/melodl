@@ -16,7 +16,9 @@ pub fn md5_hex(data: &str) -> String {
 pub fn random_string(n: usize) -> String {
     const CHARS: &[u8] = b"1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let mut rng = rand::rng();
-    (0..n).map(|_| CHARS[rng.random_range(0..CHARS.len())] as char).collect()
+    (0..n)
+        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
+        .collect()
 }
 
 /// md5(f"{hash}{secret}{appid}{mid}{userid}")
@@ -26,10 +28,7 @@ pub fn sign_key(hash: &str, mid: &str, userid: &str, appid: u32) -> String {
 
 /// md5(f"{secret}{sorted_params_string}{data}{secret}")
 pub fn signature_android(params: &BTreeMap<String, String>, data: &str) -> String {
-    let params_string: String = params
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect();
+    let params_string: String = params.iter().map(|(k, v)| format!("{k}={v}")).collect();
     md5_hex(&format!(
         "{SIGNATURE_ANDROID_SECRET}{params_string}{data}{SIGNATURE_ANDROID_SECRET}"
     ))

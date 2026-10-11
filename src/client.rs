@@ -240,13 +240,17 @@ impl MusicClientBuilder {
     }
 }
 
-/// 按 source+identifier 去重, 保序
+/// 按 source+root_source+identifier 去重, 保序
 fn dedup(songs: Vec<SongInfo>) -> Vec<SongInfo> {
     let mut seen = std::collections::HashSet::new();
     songs
         .into_iter()
         .filter(|s| {
-            seen.insert((s.source.clone(), s.identifier.clone())) && s.with_valid_download_url()
+            seen.insert((
+                s.source.clone(),
+                s.root_source.clone().unwrap_or_default(),
+                s.identifier.clone(),
+            )) && s.with_valid_download_url()
         })
         .collect()
 }

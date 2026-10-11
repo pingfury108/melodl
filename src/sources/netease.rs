@@ -120,7 +120,10 @@ impl MusicSource for NeteaseSource {
         }
 
         // 并发解析下载链接, 保持歌单顺序
-        tracing::info!("netease playlist meta done: {} items, parsing urls...", items.len());
+        tracing::info!(
+            "netease playlist meta done: {} items, parsing urls...",
+            items.len()
+        );
         let songs = futures::stream::iter(items)
             .map(|item| async move { parse_song(&item, ctx).await })
             .buffered(8)
@@ -182,7 +185,9 @@ async fn parse_with_kangqiovo(item: &Value, song_id: u64, ctx: &SearchCtx) -> Op
         else {
             break;
         };
-        let Ok(json) = resp.json::<Value>().await else { continue };
+        let Ok(json) = resp.json::<Value>().await else {
+            continue;
+        };
         let Some(url) = json
             .pointer("/data/url")
             .and_then(|v| v.as_str())
@@ -259,15 +264,13 @@ async fn parse_with_bugpk(item: &Value, song_id: u64, ctx: &SearchCtx) -> Option
             .send()
             .await
             .ok()?;
-        let Ok(json) = resp.json::<Value>().await else { continue };
-        let Some(url) = json
-            .get("url")
-            .and_then(|v| v.as_str())
-            .filter(|u| {
-                u.starts_with("http")
-                    && !u.starts_with("https://music.163.com/song/media/outer/url?id=")
-            })
-        else {
+        let Ok(json) = resp.json::<Value>().await else {
+            continue;
+        };
+        let Some(url) = json.get("url").and_then(|v| v.as_str()).filter(|u| {
+            u.starts_with("http")
+                && !u.starts_with("https://music.163.com/song/media/outer/url?id=")
+        }) else {
             break;
         };
         let test = tester::test_link(&ctx.client, url).await;

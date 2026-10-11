@@ -10,6 +10,9 @@ pub enum Protocol {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SongInfo {
     pub source: String,
+    /// 聚合源的上游来源 (如 meting -> netease)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_source: Option<String>,
     pub identifier: String,
     pub song_name: String,
     pub singers: String,
@@ -59,10 +62,7 @@ impl SongInfo {
         let mut path = dir.join(self.file_name());
         let mut idx = 1;
         while path.exists() {
-            let stem = format!(
-                "{} - {} ({})",
-                self.song_name, self.identifier, idx
-            );
+            let stem = format!("{} - {} ({})", self.song_name, self.identifier, idx);
             let ext = self.ext.as_deref().unwrap_or("mp3").trim_start_matches('.');
             path = dir.join(sanitize_filename::sanitize(format!("{}.{}", stem, ext)));
             idx += 1;

@@ -33,7 +33,9 @@ fn md5_hex(parts: &[&str]) -> String {
 
 fn random_chars(chars: &[u8], n: usize) -> String {
     let mut rng = rand::rng();
-    (0..n).map(|_| chars[rng.random_range(0..chars.len())] as char).collect()
+    (0..n)
+        .map(|_| chars[rng.random_range(0..chars.len())] as char)
+        .collect()
 }
 
 pub fn random_guid() -> String {
@@ -110,7 +112,8 @@ fn rsa_encrypt(content: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn random_payload() -> Value {
-    let uptimes = chrono::Local::now() - chrono::Duration::seconds(rand::rng().random_range(0..14400));
+    let uptimes =
+        chrono::Local::now() - chrono::Duration::seconds(rand::rng().random_range(0..14400));
     let reserved = serde_json::json!({
         "harmony": "0", "oz": "UhYmelwouA+V2nPWbOvLTgN2/m8jwGB+yUB5v9tysQg=",
         "oo": "Xecjt+9S1+f8Pz2VLSxgpw==", "kelong": "0",
@@ -180,7 +183,10 @@ async fn obtain_qimei_inner(client: &reqwest::Client) -> Option<String> {
         SECRET,
         &extra,
     ]);
-    let header_sign = md5_hex(&["qimei_qq_androidpzAuCmaFAaFaHrdakPjLIEqKrGnSOOvH", &ts.to_string()]);
+    let header_sign = md5_hex(&[
+        "qimei_qq_androidpzAuCmaFAaFaHrdakPjLIEqKrGnSOOvH",
+        &ts.to_string(),
+    ]);
 
     let resp = client
         .post("https://api.tencentmusic.com/tme/trpc/proxy")

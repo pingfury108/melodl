@@ -51,6 +51,7 @@ form_urlencoded = "1"
 
 # 音频
 lofty = "0.22"          # 标签/封面
+m3u8-rs = "6"           # HLS 播放列表解析
 
 # cli
 clap = { version = "4", features = ["derive"], optional = true }

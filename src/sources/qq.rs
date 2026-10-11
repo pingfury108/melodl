@@ -110,7 +110,10 @@ impl MusicSource for QqSource {
         let resp = ctx
             .client
             .get("https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg")
-            .header("Referer", format!("https://y.qq.com/n/ryqq/playlist/{playlist_id}"))
+            .header(
+                "Referer",
+                format!("https://y.qq.com/n/ryqq/playlist/{playlist_id}"),
+            )
             .query(&[
                 ("disstid", playlist_id.as_str()),
                 ("type", "1"),
@@ -170,7 +173,9 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
             .send()
             .await;
         let Ok(resp) = resp else { continue };
-        let Ok(json) = resp.json::<Value>().await else { continue };
+        let Ok(json) = resp.json::<Value>().await else {
+            continue;
+        };
         let purl = json
             .pointer("/music.vkey.GetVkey.UrlGetVkey/data/midurlinfo/0/purl")
             .and_then(|v| v.as_str())
@@ -210,12 +215,9 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
             ext: test.ext,
             file_size_bytes: test.file_size_bytes,
             duration_s: item.get("interval").and_then(|v| v.as_u64()),
-            cover_url: item
-                .get("albummid")
-                .and_then(|v| v.as_str())
-                .map(|amid| {
-                    format!("https://y.gtimg.cn/music/photo_new/T002R800x800M000{amid}.jpg")
-                }),
+            cover_url: item.get("albummid").and_then(|v| v.as_str()).map(|amid| {
+                format!("https://y.gtimg.cn/music/photo_new/T002R800x800M000{amid}.jpg")
+            }),
             download_url: Some(test.final_url.clone()),
             raw_data: item.clone(),
             ..Default::default()
@@ -246,7 +248,9 @@ async fn supplement_lyric(song: &mut SongInfo, ctx: &SearchCtx) {
     else {
         return;
     };
-    let Ok(json) = resp.json::<Value>().await else { return };
+    let Ok(json) = resp.json::<Value>().await else {
+        return;
+    };
     let Some(b64) = json.get("lyric").and_then(|v| v.as_str()) else {
         return;
     };

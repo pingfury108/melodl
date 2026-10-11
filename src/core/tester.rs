@@ -29,7 +29,8 @@ pub async fn test_link(client: &reqwest::Client, url: &str) -> LinkTestResult {
             result.file_size_bytes = content_length(resp.headers());
             let ct = header_str(resp.headers(), CONTENT_TYPE).map(str::to_string);
             let cd = header_str(resp.headers(), CONTENT_DISPOSITION).map(str::to_string);
-            if let Some(ext) = infer_ext(url, &result.final_url, ct.as_deref(), cd.as_deref(), &[]) {
+            if let Some(ext) = infer_ext(url, &result.final_url, ct.as_deref(), cd.as_deref(), &[])
+            {
                 result.ext = Some(ext);
                 result.ok = true;
                 return result;
@@ -38,12 +39,7 @@ pub async fn test_link(client: &reqwest::Client, url: &str) -> LinkTestResult {
     }
 
     // 2) GET 采样前 8KB
-    if let Ok(resp) = client
-        .get(url)
-        .header(RANGE, "bytes=0-8191")
-        .send()
-        .await
-    {
+    if let Ok(resp) = client.get(url).header(RANGE, "bytes=0-8191").send().await {
         result.status = resp.status().as_u16();
         result.final_url = resp.url().to_string();
         if resp.status().is_success() || resp.status().as_u16() == 206 {
@@ -68,7 +64,10 @@ pub async fn test_link(client: &reqwest::Client, url: &str) -> LinkTestResult {
     result
 }
 
-fn header_str(headers: &reqwest::header::HeaderMap, name: reqwest::header::HeaderName) -> Option<&str> {
+fn header_str(
+    headers: &reqwest::header::HeaderMap,
+    name: reqwest::header::HeaderName,
+) -> Option<&str> {
     headers.get(name).and_then(|v| v.to_str().ok())
 }
 

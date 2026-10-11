@@ -129,7 +129,11 @@ async fn build_song(
             .get("duration")
             .or_else(|| item.get("Duration"))
             .and_then(|v| v.as_u64())
-            .or_else(|| item.get("timelen").and_then(|v| v.as_u64()).map(|ms| ms / 1000)),
+            .or_else(|| {
+                item.get("timelen")
+                    .and_then(|v| v.as_u64())
+                    .map(|ms| ms / 1000)
+            }),
         cover_url: item
             .pointer("/trans_param/union_cover")
             .and_then(|v| v.as_str())
@@ -167,7 +171,9 @@ async fn supplement_lyric(song: &mut SongInfo, item: &Value, ctx: &SearchCtx) {
     else {
         return;
     };
-    let Ok(json) = resp.json::<Value>().await else { return };
+    let Ok(json) = resp.json::<Value>().await else {
+        return;
+    };
     let candidate = json
         .pointer("/candidates/0")
         .cloned()
@@ -195,7 +201,9 @@ async fn supplement_lyric(song: &mut SongInfo, item: &Value, ctx: &SearchCtx) {
     else {
         return;
     };
-    let Ok(json) = resp.json::<Value>().await else { return };
+    let Ok(json) = resp.json::<Value>().await else {
+        return;
+    };
     if let Some(content) = json.get("content").and_then(|v| v.as_str()) {
         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(content) {
             if let Ok(text) = String::from_utf8(bytes) {

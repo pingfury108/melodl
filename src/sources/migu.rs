@@ -105,7 +105,9 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
         .flatten()
         .collect();
     formats.sort_by_key(|f| {
-        std::cmp::Reverse(quality_rank(f.get("formatType").and_then(|v| v.as_str()).unwrap_or("")))
+        std::cmp::Reverse(quality_rank(
+            f.get("formatType").and_then(|v| v.as_str()).unwrap_or(""),
+        ))
     });
 
     for format in formats {
@@ -114,7 +116,9 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
             continue;
         }
         let resource_type = format.get("resourceType")?.as_str()?;
-        let Some(url) = fetch_download_url(&content_id, &copyright_id, resource_type, format_type, ctx).await else {
+        let Some(url) =
+            fetch_download_url(&content_id, &copyright_id, resource_type, format_type, ctx).await
+        else {
             continue;
         };
         let test = tester::test_link(&ctx.client, &url).await;
@@ -143,14 +147,12 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
                 })
                 .unwrap_or_else(|| "unknown".to_string()),
             album: non_empty(item.get("album").and_then(|v| v.as_str())).or_else(|| {
-                item.get("albums")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|a| a.get("name").and_then(|n| n.as_str()))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    })
+                item.get("albums").and_then(|v| v.as_array()).map(|arr| {
+                    arr.iter()
+                        .filter_map(|a| a.get("name").and_then(|n| n.as_str()))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
             }),
             ext: test.ext,
             file_size_bytes: test.file_size_bytes,
@@ -236,7 +238,10 @@ fn extract_cover(item: &Value) -> Option<String> {
 
 async fn supplement_lyric(song: &mut SongInfo, copyright_id: &str, item: &Value, ctx: &SearchCtx) {
     // 优先搜索结果自带 lyricUrl, 否则走 pc listen 接口拿 lrcUrl
-    let mut lyric_url = item.get("lyricUrl").and_then(|v| v.as_str()).map(str::to_string);
+    let mut lyric_url = item
+        .get("lyricUrl")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
     if lyric_url.is_none() {
         if let Ok(resp) = ctx
             .client

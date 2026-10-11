@@ -104,8 +104,16 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
         let mut song = SongInfo {
             source: "fivesing".to_string(),
             identifier: song_id.to_string(),
-            song_name: strip_html_tags(item.get("songName").and_then(|v| v.as_str()).unwrap_or("unknown")),
-            singers: strip_html_tags(item.get("singer").and_then(|v| v.as_str()).unwrap_or("unknown")),
+            song_name: strip_html_tags(
+                item.get("songName")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown"),
+            ),
+            singers: strip_html_tags(
+                item.get("singer")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown"),
+            ),
             ext: test.ext,
             file_size_bytes: test.file_size_bytes,
             download_url: Some(test.final_url.clone()),
