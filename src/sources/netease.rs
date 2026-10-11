@@ -5,10 +5,11 @@ use async_trait::async_trait;
 use rand::Rng;
 use serde_json::Value;
 
-use crate::core::text::{clean_lrc, non_empty};
+use crate::core::text::{self, clean_lrc, non_empty};
 use crate::core::{tester, MusicSource, SearchCtx, SongInfo};
 use crate::crypto;
 use crate::error::Result;
+use futures::StreamExt;
 
 pub fn create() -> Box<dyn MusicSource> {
     Box::new(NeteaseSource)
@@ -70,23 +71,91 @@ impl MusicSource for NeteaseSource {
         }
         Ok(songs)
     }
+
+    async fn parse_playlist(&self, url: &str, ctx: &SearchCtx) -> Result<Vec<SongInfo>> {
+        let Some(playlist_id) =
+            text::extract_url_param(url, "id").or_else(|| text::extract_path_id(url))
+        else {
+            return Ok(vec![]);
+        };
+        let resp = ctx
+            .client
+            .post("https://music.163.com/api/v6/playlist/detail")
+            .form(&[("id", playlist_id.as_str())])
+            .send()
+            .await?;
+        let json: Value = resp.json().await?;
+        let ids: Vec<u64> = json
+            .pointer("/playlist/trackIds")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|t| t.get("id")?.as_u64()).collect())
+            .unwrap_or_default();
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        tracing::info!("netease playlist {} tracks, fetching meta...", ids.len());
+
+        // 批量拿歌曲元信息 (每批 100)
+        let mut items: Vec<Value> = Vec::new();
+        for chunk in ids.chunks(100) {
+            let c = serde_json::to_string(
+                &chunk
+                    .iter()
+                    .map(|id| serde_json::json!({"id": id, "v": 0}))
+                    .collect::<Vec<_>>(),
+            )?;
+            if let Ok(resp) = ctx
+                .client
+                .post("https://interface3.music.163.com/api/v3/song/detail")
+                .form(&[("c", c)])
+                .send()
+                .await
+            {
+                if let Ok(j) = resp.json::<Value>().await {
+                    if let Some(arr) = j.get("songs").and_then(|v| v.as_array()) {
+                        items.extend(arr.iter().cloned());
+                    }
+                }
+            }
+        }
+
+        // 并发解析下载链接, 保持歌单顺序
+        tracing::info!("netease playlist meta done: {} items, parsing urls...", items.len());
+        let songs = futures::stream::iter(items)
+            .map(|item| async move { parse_song(&item, ctx).await })
+            .buffered(8)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
+        Ok(songs)
+    }
 }
 
 async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
     let song_id = item.get("id")?.as_u64()?;
 
-    // 官方 eapi (需要有效 MUSIC_U cookie, 匿名基本不可用)
+    // 官方 eapi (需要有效 MUSIC_U cookie, 匿名基本不可用): 连续 2 个音质无 url 即放弃
+    let mut empty_streak = 0;
     for quality in MUSIC_QUALITIES {
-        let Some(url) = fetch_download_url(song_id, quality, ctx).await else {
-            continue;
-        };
-        let test = tester::test_link(&ctx.client, &url).await;
-        if !test.ok {
-            continue;
+        match fetch_download_url(song_id, quality, ctx).await {
+            Some(url) => {
+                let test = tester::test_link(&ctx.client, &url).await;
+                if !test.ok {
+                    continue;
+                }
+                let mut song = build_song_info(item, song_id, &test);
+                supplement_lyric(&mut song, ctx).await;
+                return Some(song);
+            }
+            None => {
+                empty_streak += 1;
+                if empty_streak >= 2 {
+                    break;
+                }
+            }
         }
-        let mut song = build_song_info(item, song_id, &test);
-        supplement_lyric(&mut song, ctx).await;
-        return Some(song);
     }
     // 第三方兜底
     if let Some(song) = parse_with_kangqiovo(item, song_id, ctx).await {
@@ -97,7 +166,8 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
 
 /// kangqiovo 第三方解析: POST https://ncm.kangqiovo.com/Song_V1
 async fn parse_with_kangqiovo(item: &Value, song_id: u64, ctx: &SearchCtx) -> Option<SongInfo> {
-    for quality in MUSIC_QUALITIES {
+    // 高音质优先, 最多试 3 档
+    for quality in MUSIC_QUALITIES.iter().take(3) {
         let Ok(resp) = ctx
             .client
             .post("https://ncm.kangqiovo.com/Song_V1")

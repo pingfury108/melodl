@@ -64,9 +64,10 @@ async fn main() -> anyhow::Result<()> {
     let concurrency = cli.concurrency.or(config.concurrency).unwrap_or(5);
 
     // 关键词: 参数缺失时交互输入
-    let keyword = match cli.keyword.clone() {
-        Some(k) => k,
-        None => {
+    let keyword = match (cli.keyword.clone(), cli.playlist.clone()) {
+        (Some(k), _) => k,
+        (None, Some(p)) => format!("playlist:{p}"),
+        (None, None) => {
             let k = Text::new("输入搜索关键词:").prompt()?;
             if k.trim().is_empty() {
                 println!("已取消");
@@ -83,13 +84,19 @@ async fn main() -> anyhow::Result<()> {
         .concurrency(concurrency)
         .build()?;
 
-    // 搜索(带 spinner)
+    // 搜索/歌单(带 spinner)
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
         ProgressStyle::with_template("{spinner} {msg}").unwrap(),
     );
     spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-    spinner.set_message(format!("正在从 {} 搜索「{}」...", source_names.join(","), keyword));
+
+    let is_playlist = keyword.starts_with("playlist:");
+    spinner.set_message(if is_playlist {
+        format!("正在解析歌单 {}", &keyword[9..])
+    } else {
+        format!("正在从 {} 搜索「{}」...", source_names.join(","), keyword)
+    });
 
     // 错误事件输出到 stderr
     let (tx, mut rx) = tokio::sync::mpsc::channel::<ProgressEvent>(64);
@@ -101,7 +108,12 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let songs = client.search_with_events(&keyword, tx).await;
+    let songs = if is_playlist {
+        drop(tx); // 歌单解析不走事件通道, 关闭以便 err_printer 退出
+        client.parse_playlist(&keyword[9..]).await
+    } else {
+        client.search_with_events(&keyword, tx).await
+    };
     spinner.finish_and_clear();
     let _ = err_printer.await;
 

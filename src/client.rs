@@ -103,6 +103,46 @@ impl MusicClient {
         dedup(all)
     }
 
+    /// 解析歌单 URL: 优先 host 匹配的源(未配置时临时构建), 再依次尝试其他源
+    pub async fn parse_playlist(&self, url: &str) -> Vec<SongInfo> {
+        let ctx = SearchCtx {
+            client: self.http.clone(),
+            search_size_per_source: self.search_size_per_source,
+            search_size_per_page: self.search_size_per_page,
+            max_retries: self.max_retries,
+            events: None,
+        };
+        let host = reqwest::Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_string))
+            .unwrap_or_default();
+
+        // host 匹配的源名(即使未在配置中也启用)
+        let matched_name = ["netease", "qq", "kuwo", "kugou", "migu", "fivesing"]
+            .into_iter()
+            .find(|n| host_matches_source(&host, n));
+        if let Some(name) = matched_name {
+            if let Some(src) = registry::build(name) {
+                match src.parse_playlist(url, &ctx).await {
+                    Ok(songs) if !songs.is_empty() => return songs,
+                    Ok(_) => {}
+                    Err(e) => tracing::debug!("{} parse_playlist failed: {}", name, e),
+                }
+            }
+        }
+        for source in &self.sources {
+            if Some(source.name()) == matched_name {
+                continue;
+            }
+            match source.parse_playlist(url, &ctx).await {
+                Ok(songs) if !songs.is_empty() => return songs,
+                Ok(_) => {}
+                Err(e) => tracing::debug!("{} parse_playlist failed: {}", source.name(), e),
+            }
+        }
+        vec![]
+    }
+
     pub async fn download(&self, songs: &[SongInfo]) -> Vec<PathBuf> {
         self.download_inner(songs, None).await
     }
@@ -213,4 +253,16 @@ fn dedup(songs: Vec<SongInfo>) -> Vec<SongInfo> {
 
 fn default_ua() -> String {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36".to_string()
+}
+
+fn host_matches_source(host: &str, source: &str) -> bool {
+    match source {
+        "netease" => host.ends_with("163.com"),
+        "qq" => host.ends_with("qq.com"),
+        "kugou" => host.contains("kugou.com"),
+        "kuwo" => host.contains("kuwo.cn"),
+        "migu" => host.contains("migu.cn"),
+        "fivesing" => host.contains("5sing"),
+        _ => false,
+    }
 }

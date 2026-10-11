@@ -6,10 +6,11 @@ use async_trait::async_trait;
 use base64::Engine;
 use serde_json::Value;
 
-use crate::core::text::{clean_lrc, non_empty};
+use crate::core::text::{self, clean_lrc, non_empty};
 use crate::core::{tester, MusicSource, SearchCtx, SongInfo};
 use crate::crypto::qq;
 use crate::error::Result;
+use futures::StreamExt;
 
 pub fn create() -> Box<dyn MusicSource> {
     Box::new(QqSource)
@@ -99,10 +100,53 @@ impl MusicSource for QqSource {
         }
         Ok(songs)
     }
+
+    async fn parse_playlist(&self, url: &str, ctx: &SearchCtx) -> Result<Vec<SongInfo>> {
+        let Some(playlist_id) =
+            text::extract_url_param(url, "id").or_else(|| text::extract_path_id(url))
+        else {
+            return Ok(vec![]);
+        };
+        let resp = ctx
+            .client
+            .get("https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg")
+            .header("Referer", format!("https://y.qq.com/n/ryqq/playlist/{playlist_id}"))
+            .query(&[
+                ("disstid", playlist_id.as_str()),
+                ("type", "1"),
+                ("json", "1"),
+                ("utf8", "1"),
+                ("onlysong", "0"),
+                ("format", "json"),
+            ])
+            .send()
+            .await?;
+        let json: Value = resp.json().await?;
+        let list = json
+            .pointer("/cdlist/0/songlist")
+            .or_else(|| json.pointer("/cdlist/0/list"))
+            .or_else(|| json.pointer("/songlist"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let songs = futures::stream::iter(list)
+            .map(|item| async move { parse_song(&item, ctx).await })
+            .buffered(8)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
+        Ok(songs)
+    }
 }
 
 async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
-    let mid = item.get("songmid").and_then(|v| v.as_str())?;
+    let mid = item
+        .get("songmid")
+        .or_else(|| item.get("mid"))
+        .and_then(|v| v.as_str())?;
 
     for (prefix, suffix) in QUALITIES {
         let params = serde_json::json!({

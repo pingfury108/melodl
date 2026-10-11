@@ -40,6 +40,10 @@ pub struct Cli {
     #[arg(short = 'i', long, global = true)]
     pub ids: Option<String>,
 
+    /// 歌单 URL, 解析歌单内所有歌曲
+    #[arg(short = 'p', long, global = true)]
+    pub playlist: Option<String>,
+
     /// JSON 输出搜索结果(供其他程序集成)
     #[arg(long, global = true)]
     pub json: bool,

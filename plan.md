@@ -287,8 +287,8 @@ comfy-table = { version = "7", optional = true }
 
 ### P4 — 扩展(按需渐进)
 
+- [x] 歌单解析 `parse_playlist`(网易云/QQ/酷我, host 自动匹配源, 并发解析保序)
 - [ ] HLS 下载 (m3u8-rs + ffmpeg remux)
-- [ ] 歌单解析 `parse_playlist`(网易云/QQ/5sing)
 - [ ] 聚合源: gdstudio / tunehub / jbsou
 - [ ] 有声源(episodes): 喜马拉雅 / 蜻蜓FM
 - [ ] 更多第三方站(scraper)

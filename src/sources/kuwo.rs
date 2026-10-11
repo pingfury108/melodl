@@ -3,10 +3,11 @@
 use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::core::text::clean_lrc;
+use crate::core::text::{self, clean_lrc};
 use crate::core::{tester, MusicSource, SearchCtx, SongInfo};
 use crate::crypto;
 use crate::error::Result;
+use futures::StreamExt;
 
 pub fn create() -> Box<dyn MusicSource> {
     Box::new(KuwoSource)
@@ -70,6 +71,58 @@ impl MusicSource for KuwoSource {
                 break;
             }
         }
+        Ok(songs)
+    }
+
+    async fn parse_playlist(&self, url: &str, ctx: &SearchCtx) -> Result<Vec<SongInfo>> {
+        let Some(playlist_id) =
+            text::extract_url_param(url, "id").or_else(|| text::extract_path_id(url))
+        else {
+            return Ok(vec![]);
+        };
+        // 分页拿歌单曲目
+        let mut items: Vec<Value> = Vec::new();
+        let mut page = 1u32;
+        loop {
+            let Ok(resp) = ctx
+                .client
+                .get("https://m.kuwo.cn/newh5app/wapi/api/www/playlist/playListInfo")
+                .query(&[
+                    ("pid", playlist_id.as_str()),
+                    ("pn", &page.to_string()),
+                    ("rn", "100"),
+                ])
+                .send()
+                .await
+            else {
+                break;
+            };
+            let Ok(json) = resp.json::<Value>().await else { break };
+            let Some(list) = json.pointer("/data/musicList").and_then(|v| v.as_array()) else {
+                break;
+            };
+            if list.is_empty() {
+                break;
+            }
+            items.extend(list.iter().cloned());
+            let total = json
+                .pointer("/data/total")
+                .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or_else(|| v.as_u64().map(|n| n as usize)))
+                .unwrap_or(0);
+            if items.len() >= total {
+                break;
+            }
+            page += 1;
+        }
+
+        let songs = futures::stream::iter(items)
+            .map(|item| async move { parse_song(&item, ctx).await })
+            .buffered(8)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
         Ok(songs)
     }
 }
