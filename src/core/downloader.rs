@@ -6,8 +6,69 @@ use futures::StreamExt;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 
+use lofty::picture::MimeType;
 use super::{tags, ProgressEvent, SongInfo};
 use crate::error::{MelodlError, Result};
+
+/// 根据 URL host 推断 Referer (防盗链)
+fn infer_referer(url: &str) -> Option<&'static str> {
+    if url.contains("y.qq.com") || url.contains("gtimg.cn") {
+        Some("https://y.qq.com/")
+    } else if url.contains("163.com") || url.contains("music.126.net") {
+        Some("https://music.163.com/")
+    } else if url.contains("kuwo.cn") {
+        Some("https://www.kuwo.cn/")
+    } else if url.contains("kugou.com") {
+        Some("https://www.kugou.com/")
+    } else {
+        None
+    }
+}
+
+/// magic bytes 检测图片 mime
+fn detect_mime(bytes: &[u8]) -> Option<MimeType> {
+    match bytes {
+        [0xFF, 0xD8, ..] => Some(MimeType::Jpeg),
+        [0x89, 0x50, 0x4E, 0x47, ..] => Some(MimeType::Png),
+        [0x47, 0x49, 0x46, ..] => Some(MimeType::Gif),
+        [0x42, 0x4D, ..] => Some(MimeType::Bmp),
+        _ => None,
+    }
+}
+
+/// 下载封面图片, 失败返回 None 并打 warn
+async fn fetch_cover(client: &reqwest::Client, url: &str) -> Option<(Vec<u8>, MimeType)> {
+    if !url.starts_with("http") {
+        return None;
+    }
+    let mut req = client.get(url);
+    if let Some(referer) = infer_referer(url) {
+        req = req.header("Referer", referer);
+    }
+    match req.send().await {
+        Ok(resp) => match resp.bytes().await {
+            Ok(bytes) if !bytes.is_empty() => match detect_mime(&bytes) {
+                Some(mime) => Some((bytes.to_vec(), mime)),
+                None => {
+                    tracing::warn!("cover unknown mime: {} (first bytes: {:02x?})", url, &bytes[..bytes.len().min(8)]);
+                    None
+                }
+            },
+            Ok(_) => {
+                tracing::warn!("cover empty: {}", url);
+                None
+            }
+            Err(e) => {
+                tracing::warn!("cover download failed: {} ({})", url, e);
+                None
+            }
+        },
+        Err(e) => {
+            tracing::warn!("cover request failed: {} ({})", url, e);
+            None
+        }
+    }
+}
 
 pub async fn download_song(
     client: &reqwest::Client,
@@ -104,7 +165,12 @@ async fn download_hls(
     }
     file.flush().await?;
 
-    tags::write_tags(&save_path, &song, None);
+    // 封面 + 标签
+    let cover = match &song.cover_url {
+        Some(u) => fetch_cover(client, u).await,
+        None => None,
+    };
+    tags::write_tags(&save_path, &song, cover);
     emit(ProgressEvent::DownloadFinished {
         id,
         path: save_path.display().to_string(),
@@ -174,15 +240,8 @@ async fn download_http(
 
     // 封面 + 标签
     let cover = match &song.cover_url {
-        Some(u) if u.starts_with("http") => match client.get(u).send().await {
-            Ok(r) => r
-                .bytes()
-                .await
-                .ok()
-                .map(|b| (b.to_vec(), tags::cover_mime(u))),
-            Err(_) => None,
-        },
-        _ => None,
+        Some(u) => fetch_cover(client, u).await,
+        None => None,
     };
     tags::write_tags(&save_path, song, cover);
 

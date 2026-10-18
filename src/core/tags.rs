@@ -10,11 +10,11 @@ use lofty::tag::{ItemKey, Tag};
 
 use super::SongInfo;
 
-/// 写入基本标签 + 封面, 失败静默(不影响下载结果)
+/// 写入基本标签 + 封面, 失败打印 error 日志
 pub fn write_tags(path: &Path, song: &SongInfo, cover: Option<(Vec<u8>, MimeType)>) {
-    let _ = write_tags_inner(path, song, cover).map_err(|e| {
-        tracing::warn!("write tags failed for {}: {}", path.display(), e);
-    });
+    if let Err(e) = write_tags_inner(path, song, cover) {
+        tracing::error!("write tags failed for {}: {}", path.display(), e);
+    }
 }
 
 fn write_tags_inner(
@@ -54,6 +54,8 @@ fn write_tags_inner(
     Ok(())
 }
 
+// cover_mime 已由 downloader::detect_mime (magic bytes) 替代
+#[allow(dead_code)]
 pub fn cover_mime(url: &str) -> MimeType {
     if url.contains(".png") {
         MimeType::Png
