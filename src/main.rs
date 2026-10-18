@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 下载(带进度条)
-    download_with_progress(&client, &selected).await;
+    download_with_progress(&client, selected).await;
     Ok(())
 }
 
@@ -218,7 +218,7 @@ fn interactive_select(songs: &[SongInfo]) -> anyhow::Result<Vec<SongInfo>> {
         .collect())
 }
 
-async fn download_with_progress(client: &MusicClient, songs: &[SongInfo]) {
+async fn download_with_progress(client: &MusicClient, songs: Vec<SongInfo>) {
     let mp = MultiProgress::new();
     let (tx, mut rx) = tokio::sync::mpsc::channel::<ProgressEvent>(256);
 
@@ -256,10 +256,11 @@ async fn download_with_progress(client: &MusicClient, songs: &[SongInfo]) {
         }
     });
 
+    let total = songs.len();
     let paths = client.download_with_events(songs, tx).await;
     let _ = render.await;
 
-    println!("\n下载完成 {}/{} 首:", paths.len(), songs.len());
+    println!("\n下载完成 {}/{} 首:", paths.len(), total);
     for p in &paths {
         println!("  {}", p.display());
     }

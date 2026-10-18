@@ -143,13 +143,13 @@ impl MusicClient {
         vec![]
     }
 
-    pub async fn download(&self, songs: &[SongInfo]) -> Vec<PathBuf> {
+    pub async fn download(&self, songs: Vec<SongInfo>) -> Vec<PathBuf> {
         self.download_inner(songs, None).await
     }
 
     pub async fn download_with_events(
         &self,
-        songs: &[SongInfo],
+        songs: Vec<SongInfo>,
         tx: mpsc::Sender<ProgressEvent>,
     ) -> Vec<PathBuf> {
         self.download_inner(songs, Some(tx)).await
@@ -157,17 +157,17 @@ impl MusicClient {
 
     async fn download_inner(
         &self,
-        songs: &[SongInfo],
+        songs: Vec<SongInfo>,
         events: Option<mpsc::Sender<ProgressEvent>>,
     ) -> Vec<PathBuf> {
         let tasks = songs
-            .iter()
+            .into_iter()
             .filter(|s| s.with_valid_download_url())
             .map(|song| {
                 let client = self.http.clone();
                 let dir = self.work_dir.clone();
                 let events = events.clone();
-                async move { downloader::download_song(&client, song, &dir, events.as_ref()).await }
+                async move { downloader::download_song(&client, &song, &dir, events.as_ref()).await }
             });
 
         let mut paths = Vec::new();

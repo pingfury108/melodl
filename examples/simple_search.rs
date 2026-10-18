@@ -21,7 +21,7 @@ async fn main() -> melodl::Result<()> {
     }
 
     if let Some(first) = songs.first() {
-        let paths = client.download(std::slice::from_ref(first)).await;
+        let paths = client.download(vec![first.clone()]).await;
         println!("下载完成: {:?}", paths);
     }
     Ok(())
