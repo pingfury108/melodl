@@ -184,7 +184,21 @@ async fn parse_song(item: &Value, ctx: &SearchCtx) -> Option<SongInfo> {
                 .or_else(|| item.get("albumpic"))
                 .or_else(|| item.get("pic"))
                 .and_then(|v| v.as_str())
-                .map(str::to_string),
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .or_else(|| {
+                    // 兜底: 歌手头像 (相对路径转绝对)
+                    item.get("web_artistpic_short")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| {
+                            if s.starts_with("http") {
+                                s.to_string()
+                            } else {
+                                format!("https://img1.kuwo.cn/star/starheads/{s}")
+                            }
+                        })
+                }),
             download_url: Some(test.final_url.clone()),
             raw_data: item.clone(),
             ..Default::default()
